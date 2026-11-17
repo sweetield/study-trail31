@@ -1,0 +1,52 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "study-trail31",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": { "enabled": true },
+  // 每天 UTC 19:00（北京时间 03:00）清理过期会话、旧通知与审计日志
+  "triggers": { "crons": ["0 19 * * *"] },
+
+  // ===== 固定资源名称 =====
+  // D1 与 R2 使用固定名称：重新部署、重新创建 Worker 时会自动复用同名资源，
+  // 不会因为换了 Worker 而生成一套空数据库/空存储桶。
+  // 不写 database_id / bucket_name 的 id：首次部署时由 Cloudflare 自动创建，
+  // 之后沿用已绑定的资源；Deploy Button 会允许用户确认或修改下面的默认名称。
+  "d1_databases": [{ "binding": "DB", "database_name": "study-trail-db","database_id": "fb384c18-5d92-420d-b4bc-f8c1a74f5785" }],
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "study-trail-files","preview_bucket_name": "study-trail-files" }],
+
+  // ===== 文件存储：R2 或 KV =====
+  // 默认同时声明 R2 与 KV，兼容仍在使用 KV 的旧部署；系统会自动使用实际绑定的一种，
+  // 不会在初始化或后台切换，也不会同时写入两种存储。
+  // 如果只想使用 R2：删除下面 kv_namespaces 整项；
+  // 如果只想使用 KV：删除上面 r2_buckets 整项，保留 kv_namespaces。
+  // KV 没有 config 中的固定名称字段：Deploy Button / Wrangler 自动创建时使用
+  // 默认标题 study-trail-file-kv。若要复用旧 KV，可在部署配置中选择已有命名空间，
+  // 或把已有命名空间的 id 填到 "id" 中（不要同时保留自动创建）。
+  "kv_namespaces": [{ "binding": "FILE_KV","id": "0f23e26787644d1da929c62625f75c55" }]
+
+  // ===== 强制指定存储后端（可选） =====
+  // 正常不需要设置；只有绑定了多种存储、需要覆盖自动识别结果时才使用。
+  // "vars": { "FILE_STORAGE": "kv" }
+
+  // ===== 可选：固定文件加密密钥 =====
+  // 不配置时，首次上传会自动生成 32 字节 AES-256-GCM 密钥并保存到 D1，
+  // 同一 D1 数据库的多个实例会共享同一密钥。若手动配置，支持 Base64、
+  // 64 位十六进制或 32 字符原始密钥；更换密钥会导致旧文件无法解密。
+  // "vars": { "FILE_ENCRYPTION_KEY": "<32-byte-secret>" }
+
+  // ===== 可选：存储配额（单位 MB） =====
+  // 不配置时使用默认值：单个学员 512 MB、单条日志 / 任务 / 留言 / 审核 100 MB。
+  // STORAGE_TOTAL_MB 只影响管理端「存储用量」页的容量展示口径：
+  // 默认按 R2 免费额度 10240 MB 展示，使用 KV 时按 1024 MB 展示。
+  // "vars": {
+  //   "STORAGE_TOTAL_MB": "10240",
+  //   "STORAGE_STUDENT_MB": "512",
+  //   "STORAGE_SCOPE_MB": "100"
+  // }
+}
